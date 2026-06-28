@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Receipts">
+<title>Receipt Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap');
+  :root {
+    --ink:#0f0f0f; --paper:#f7f6f3; --rule:#d8d6cf;
+    --accent:#2563eb; --accent-light:#eff4ff;
+    --success:#059669; --success-light:#ecfdf5;
+    --danger:#dc2626; --warning:#d97706; --warning-light:#fffbeb;
+    --mono:'IBM Plex Mono',monospace; --sans:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+  header{width:100%;max-width:520px;padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center;}
+  .logo{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;}
+  .badge{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#666;border:1px solid var(--rule);padding:3px 8px;border-radius:2px;}
+  main{width:100%;max-width:520px;padding:16px 20px;flex:1;display:flex;flex-direction:column;gap:12px;}
+
+  /* Setup */
+  .setup-screen{display:flex;flex-direction:column;gap:20px;padding:24px 0 8px;}
+  .setup-hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .setup-icon{width:56px;height:56px;background:var(--accent-light);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--accent);}
+  .setup-title{font-size:20px;font-weight:600;}
+  .setup-sub{font-size:14px;color:#666;line-height:1.5;max-width:320px;}
+  .setup-steps{background:white;border:1px solid var(--rule);border-radius:10px;overflow:hidden;}
+  .setup-step{display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-bottom:1px solid var(--rule);}
+  .setup-step:last-child{border-bottom:none;}
+  .step-num{width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+  .step-text{font-size:13px;line-height:1.5;color:#444;}
+  .step-text a{color:var(--accent);text-decoration:none;font-weight:500;}
+  .step-text strong{color:var(--ink);}
+  .key-input-wrap{display:flex;flex-direction:column;gap:8px;}
+  .key-input-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#888;}
+  .key-input-row{display:flex;gap:8px;}
+  .key-input{flex:1;padding:11px 12px;border:1.5px solid var(--rule);border-radius:8px;font-family:var(--mono);font-size:13px;color:var(--ink);background:white;}
+  .key-input:focus{outline:none;border-color:var(--accent);}
+  .key-input::placeholder{color:#bbb;}
+  .key-save-btn{padding:11px 18px;background:var(--ink);color:white;border:none;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .key-save-btn:hover{opacity:.85;}
+  .key-note{font-size:11px;color:#999;font-family:var(--mono);line-height:1.5;}
+
+  /* App */
+  .app-screen{display:none;flex-direction:column;gap:12px;}
+  .app-screen.visible{display:flex;}
+  .key-bar{display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--rule);border-radius:8px;padding:10px 14px;}
+  .key-status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:#555;}
+  .key-dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0;}
+  .key-change{font-family:var(--mono);font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+  .key-change:hover{color:var(--danger);}
+
+  /* Script bar */
+  .script-bar{display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--rule);border-radius:8px;padding:10px 14px;gap:10px;}
+  .script-left{display:flex;flex-direction:column;gap:3px;}
+  .script-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:#555;}
+  .script-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .2s;}
+  .script-dot.connected{background:var(--success);}
+  .script-sub{font-family:var(--mono);font-size:11px;color:var(--success);display:none;align-items:center;gap:4px;}
+  .script-sub.visible{display:flex;}
+  .script-btn{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:white;background:var(--accent);border:none;border-radius:4px;padding:6px 12px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  .script-btn:hover{opacity:.85;}
+
+  /* Upload buttons */
+  .upload-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .upload-btn-card{border:1.5px dashed var(--rule);border-radius:10px;padding:22px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;background:white;text-align:center;}
+  .upload-btn-card:hover{border-color:var(--accent);background:var(--accent-light);}
+  .upload-btn-card input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .upload-icon{width:48px;height:48px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;color:var(--accent);}
+  .upload-icon.purple{background:#f3f0ff;color:#7c3aed;}
+  .upload-btn-label{font-size:13px;font-weight:600;}
+  .upload-btn-sub{font-size:11px;color:#888;font-family:var(--mono);}
+
+  /* Preview */
+  .preview-wrap{display:none;position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--rule);background:white;}
+  .preview-wrap.visible{display:block;}
+  .preview-wrap img{width:100%;max-height:260px;object-fit:contain;display:block;background:#f0ede8;}
+  .preview-clear{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.55);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;}
+
+  /* Scan btn */
+  .scan-btn{width:100%;padding:14px;background:var(--ink);color:white;border:none;border-radius:8px;font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;display:none;align-items:center;justify-content:center;gap:8px;}
+  .scan-btn:hover{opacity:.85;}
+  .scan-btn.visible{display:flex;}
+  .scan-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+  .scan-btn.loading .spinner{display:block;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Result */
+  .result-card{display:none;background:white;border:1px solid var(--rule);border-radius:8px;overflow:hidden;}
+  .result-card.visible{display:block;}
+  .result-header{padding:11px 16px;background:var(--success-light);border-bottom:1px solid #d1fae5;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--success);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;}
+  .field-row{display:flex;align-items:center;padding:11px 16px;border-bottom:1px solid var(--rule);gap:12px;}
+  .field-row:last-child{border-bottom:none;}
+  .field-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#888;width:72px;flex-shrink:0;}
+  .field-edit{font-size:14px;border:1px solid var(--rule);border-radius:4px;padding:5px 9px;font-family:var(--mono);color:var(--ink);width:100%;background:var(--paper);}
+  .field-edit:focus{outline:none;border-color:var(--accent);}
+  select.field-edit{cursor:pointer;}
+
+  /* Status */
+  .upload-status{display:none;padding:10px 14px;border-radius:6px;font-family:var(--mono);font-size:12px;align-items:center;gap:8px;}
+  .upload-status.visible{display:flex;}
+  .upload-status.uploading{background:var(--warning-light);color:var(--warning);border:1px solid #fde68a;}
+  .upload-status.done{background:var(--success-light);color:var(--success);border:1px solid #d1fae5;}
+  .upload-status.fail{background:#fef2f2;color:var(--danger);border:1px solid #fecaca;}
+  .mini-spinner{width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+
+  /* Error */
+  .error-msg{display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;font-size:13px;color:var(--danger);font-family:var(--mono);line-height:1.5;}
+  .error-msg.visible{display:block;}
+
+  /* Add btn */
+  .add-btn{width:100%;padding:13px;background:var(--success);color:white;border:none;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px;}
+  .add-btn:hover{opacity:.88;}
+  .add-btn.visible{display:flex;}
+  .add-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* Log */
+  .log-section{display:none;flex-direction:column;gap:10px;}
+  .log-section.visible{display:flex;}
+  .log-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+  .log-title{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#888;}
+  .log-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .sheet-link-btn{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--success);background:none;border:1px solid var(--success);border-radius:4px;padding:4px 10px;cursor:pointer;text-decoration:none;display:none;}
+  .sheet-link-btn:hover{background:var(--success);color:white;}
+  .export-btn{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:4px;padding:4px 10px;cursor:pointer;}
+  .export-btn:hover{background:var(--accent);color:white;}
+  .del-all-btn{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--danger);background:none;border:1px solid var(--danger);border-radius:4px;padding:4px 10px;cursor:pointer;}
+  .del-all-btn:hover{background:var(--danger);color:white;}
+
+  /* Cards */
+  .log-cards{display:flex;flex-direction:column;gap:8px;}
+  .log-card{background:white;border:1px solid var(--rule);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;}
+  .log-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .log-card-filename{font-family:var(--mono);font-size:10px;color:#aaa;letter-spacing:.03em;word-break:break-all;}
+  .log-card-date{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);}
+  .log-card-cat{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:3px;background:var(--accent-light);color:var(--accent);}
+  .log-card-cat.meals{background:#fef3c7;color:#92400e;}
+  .log-card-cat.lodging{background:#f3f0ff;color:#6d28d9;}
+  .log-card-cat.airfare{background:#ecfdf5;color:#065f46;}
+  .log-card-cat.transport{background:#fff7ed;color:#9a3412;}
+  .log-card-desc{font-size:13px;color:#333;font-weight:500;}
+  .log-card-merchant{font-family:var(--mono);font-size:11px;color:#666;}
+  .log-card-amount{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);}
+  .log-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:2px;}
+  .log-card-btns{display:flex;gap:6px;align-items:center;}
+  .drive-link{display:inline-flex;align-items:center;gap:3px;color:var(--accent);text-decoration:none;font-family:var(--mono);font-size:11px;}
+  .drive-link:hover{text-decoration:underline;}
+  .del-row{background:none;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;color:#999;font-size:11px;font-family:var(--mono);padding:3px 8px;transition:all .12s;}
+  .del-row:hover{border-color:var(--danger);color:var(--danger);}
+  .del-row:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* Batch */
+  .batch-toggle{width:100%;padding:11px 14px;background:white;border:1px solid var(--rule);border-radius:8px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .batch-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .batch-toggle svg{transition:transform .2s;}
+  .batch-toggle.open svg{transform:rotate(180deg);}
+  .batch-body{display:none;flex-direction:column;gap:10px;}
+  .batch-body.open{display:flex;}
+  .batch-drop{border:1.5px dashed var(--rule);border-radius:10px;padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;position:relative;background:white;text-align:center;transition:border-color .15s,background .15s;}
+  .batch-drop:hover,.batch-drop.drag-over{border-color:var(--warning);background:var(--warning-light);}
+  .batch-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .batch-drop-icon{width:44px;height:44px;border-radius:50%;background:var(--warning-light);display:flex;align-items:center;justify-content:center;color:var(--warning);}
+  .batch-drop-label{font-size:13px;font-weight:600;}
+  .batch-drop-sub{font-size:11px;color:#888;font-family:var(--mono);}
+  .batch-queue{display:flex;flex-direction:column;gap:6px;}
+  .batch-item{display:flex;align-items:center;gap:10px;background:white;border:1px solid var(--rule);border-radius:6px;padding:9px 12px;}
+  .batch-item-thumb{width:36px;height:36px;border-radius:4px;object-fit:cover;background:#f0ede8;flex-shrink:0;}
+  .batch-item-info{flex:1;min-width:0;}
+  .batch-item-name{font-family:var(--mono);font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .batch-item-status{font-family:var(--mono);font-size:10px;margin-top:2px;}
+  .batch-item-status.pending{color:#aaa;}
+  .batch-item-status.processing{color:var(--warning);}
+  .batch-item-status.done{color:var(--success);}
+  .batch-item-status.error{color:var(--danger);}
+  .batch-remove{background:none;border:none;cursor:pointer;color:#ccc;font-size:16px;padding:0 2px;flex-shrink:0;}
+  .batch-remove:hover{color:var(--danger);}
+  .batch-run-btn{width:100%;padding:13px;background:var(--warning);color:white;border:none;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .batch-run-btn:hover{opacity:.88;}
+  .batch-run-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .batch-progress{font-family:var(--mono);font-size:12px;color:#666;text-align:center;}
+
+  footer{width:100%;max-width:520px;padding:12px 20px 32px;font-family:var(--mono);font-size:10px;color:#bbb;text-align:center;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Receipt Scanner</span>
+  <span class="badge">FOR COUPA</span>
+</header>
+
+<main>
+
+  <!-- SETUP SCREEN -->
+  <div class="setup-screen" id="setupScreen" style="display:none">
+    <div class="setup-hero">
+      <div class="setup-icon">
+        <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div class="setup-title">One-time setup</div>
+      <div class="setup-sub">Enter your Anthropic API key and the Google Apps Script URL to get started.</div>
+    </div>
+    <div class="setup-steps">
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Get your Anthropic API key from <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Deploy the Google Apps Script (see instructions) and paste the Web App URL below.</div>
+      </div>
+    </div>
+    <div class="key-input-wrap">
+      <span class="key-input-label">Anthropic API Key</span>
+      <div class="key-input-row">
+        <input class="key-input" id="keyInput" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="key-input-wrap">
+      <span class="key-input-label">Apps Script URL</span>
+      <div class="key-input-row">
+        <input class="key-input" id="scriptInput" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+      </div>
+      <span class="key-note">Both are saved on this device only and never shared.</span>
+    </div>
+    <button class="key-save-btn" id="keySaveBtn" style="width:100%;padding:13px;">Save & Start</button>
+  </div>
+
+  <!-- APP SCREEN -->
+  <div class="app-screen" id="appScreen">
+
+    <div class="key-bar">
+      <div class="key-status">
+        <div class="key-dot"></div>
+        <span id="keyPreview">API key active</span>
+      </div>
+      <button class="key-change" id="keyChangeBtn">change settings</button>
+    </div>
+
+    <!-- Script / Drive status -->
+    <div class="script-bar">
+      <div class="script-left">
+        <div class="script-status">
+          <div class="script-dot" id="scriptDot"></div>
+          <span id="scriptStatusText">Connecting to Google Drive…</span>
+        </div>
+        <div class="script-sub" id="scriptSub">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Coupa Receipts/ + Expense Tracker
+        </div>
+      </div>
+      <a class="sheet-link-btn" id="sheetLinkBtn" href="#" target="_blank">Open Sheet</a>
+    </div>
+
+    <div class="upload-btns">
+      <div class="upload-btn-card">
+        <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
+        <div class="upload-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <span class="upload-btn-label">Take Photo</span>
+        <span class="upload-btn-sub">Open camera</span>
+      </div>
+      <div class="upload-btn-card">
+        <input type="file" id="fileInputLibrary" accept="image/*">
+        <div class="upload-icon purple">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </div>
+        <span class="upload-btn-label">Upload Screenshot</span>
+        <span class="upload-btn-sub">From photo library</span>
+      </div>
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" src="" alt="Receipt preview">
+      <button class="preview-clear" id="clearBtn">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <button class="scan-btn" id="scanBtn">
+      <div class="spinner"></div>
+      <span class="btn-text">Extract Date &amp; Amount</span>
+    </button>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Extracted — edit if needed
+      </div>
+      <div class="field-row">
+        <span class="field-label">Date</span>
+        <input class="field-edit" id="fieldDate" type="text" placeholder="MM/DD/YY">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Category</span>
+        <select class="field-edit" id="fieldCategory">
+          <option value="">— select —</option>
+          <option value="Airfare">Airfare</option>
+          <option value="Lodging">Lodging</option>
+          <option value="Ground Transport">Ground Transport</option>
+          <option value="Meals">Meals</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Description</span>
+        <input class="field-edit" id="fieldDesc" type="text" placeholder="e.g. 18-Apr Grab ride">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Merchant</span>
+        <input class="field-edit" id="fieldMerchant" type="text" placeholder="Merchant name">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Currency</span>
+        <input class="field-edit" id="fieldCurrency" type="text" placeholder="e.g. AUD" style="max-width:90px;">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Amount</span>
+        <input class="field-edit" id="fieldAmount" type="text" placeholder="0.00">
+      </div>
+    </div>
+
+    <div class="upload-status" id="uploadStatus">
+      <div class="mini-spinner" id="statusSpinner" style="display:none"></div>
+      <span id="statusText"></span>
+    </div>
+
+    <button class="add-btn" id="addBtn">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Save &amp; Add to Expense Log
+    </button>
+
+    <!-- BATCH -->
+    <div>
+      <button class="batch-toggle" id="batchToggle">
+        <span>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Bulk Upload — Retrospective Receipts
+        </span>
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="batch-body" id="batchBody" style="margin-top:10px;">
+        <div class="batch-drop" id="batchDrop">
+          <input type="file" id="batchInput" accept="image/*" multiple>
+          <div class="batch-drop-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <span class="batch-drop-label">Select multiple receipts</span>
+          <span class="batch-drop-sub">Tap to pick from photo library</span>
+        </div>
+        <div class="batch-queue" id="batchQueue"></div>
+        <div class="batch-progress" id="batchProgress" style="display:none"></div>
+        <button class="batch-run-btn" id="batchRunBtn" style="display:none">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="batchRunLabel">Process All</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-section" id="logSection">
+      <div class="log-heading">
+        <span class="log-title">Expense Log (<span id="logCount">0</span>)</span>
+        <div class="log-actions">
+          <a class="sheet-link-btn" id="sheetLinkBtn2" href="#" target="_blank" style="display:none">Open Sheet</a>
+          <button class="export-btn" id="exportBtn">CSV</button>
+          <button class="del-all-btn" id="delAllBtn">Delete All</button>
+        </div>
+      </div>
+      <div class="log-cards" id="logCards"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer>API KEY & SCRIPT URL STORED LOCALLY · NEVER SHARED</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  // ── STATE ─────────────────────────────────────────────────────────────────
+  var expenses   = [];
+  var scriptUrl  = '';
+
+  // ── ELEMENTS ──────────────────────────────────────────────────────────────
+  var setupScreen    = document.getElementById('setupScreen');
+  var appScreen      = document.getElementById('appScreen');
+  var keyInput       = document.getElementById('keyInput');
+  var scriptInput    = document.getElementById('scriptInput');
+  var keySaveBtn     = document.getElementById('keySaveBtn');
+  var keyPreview     = document.getElementById('keyPreview');
+  var keyChangeBtn   = document.getElementById('keyChangeBtn');
+  var scriptDot      = document.getElementById('scriptDot');
+  var scriptStatusTx = document.getElementById('scriptStatusText');
+  var scriptSub      = document.getElementById('scriptSub');
+  var sheetLinkBtn   = document.getElementById('sheetLinkBtn');
+  var sheetLinkBtn2  = document.getElementById('sheetLinkBtn2');
+  var fileInputCam   = document.getElementById('fileInputCamera');
+  var fileInputLib   = document.getElementById('fileInputLibrary');
+  var previewWrap    = document.getElementById('previewWrap');
+  var previewImg     = document.getElementById('previewImg');
+  var clearBtn       = document.getElementById('clearBtn');
+  var scanBtn        = document.getElementById('scanBtn');
+  var errorMsg       = document.getElementById('errorMsg');
+  var resultCard     = document.getElementById('resultCard');
+  var fieldDate      = document.getElementById('fieldDate');
+  var fieldCategory  = document.getElementById('fieldCategory');
+  var fieldDesc      = document.getElementById('fieldDesc');
+  var fieldMerchant  = document.getElementById('fieldMerchant');
+  var fieldCurrency  = document.getElementById('fieldCurrency');
+  var fieldAmount    = document.getElementById('fieldAmount');
+  var uploadStatus   = document.getElementById('uploadStatus');
+  var statusText     = document.getElementById('statusText');
+  var statusSpinner  = document.getElementById('statusSpinner');
+  var addBtn         = document.getElementById('addBtn');
+  var logSection     = document.getElementById('logSection');
+  var logCards       = document.getElementById('logCards');
+  var logCount       = document.getElementById('logCount');
+  var exportBtn      = document.getElementById('exportBtn');
+  var delAllBtn      = document.getElementById('delAllBtn');
+  var batchToggle    = document.getElementById('batchToggle');
+  var batchBody      = document.getElementById('batchBody');
+  var batchDrop      = document.getElementById('batchDrop');
+  var batchInput     = document.getElementById('batchInput');
+  var batchQueue     = document.getElementById('batchQueue');
+  var batchProgress  = document.getElementById('batchProgress');
+  var batchRunBtn    = document.getElementById('batchRunBtn');
+  var batchRunLabel  = document.getElementById('batchRunLabel');
+
+  var currentBase64  = null;
+  var currentFile    = null;
+  var batchFiles     = [];
+
+  // ── SETUP ─────────────────────────────────────────────────────────────────
+  function getKey()    { return localStorage.getItem('anthropic_api_key') || ''; }
+  function getScript() { return localStorage.getItem('apps_script_url')   || ''; }
+
+  function showApp(key, url) {
+    scriptUrl = url;
+    keyPreview.textContent = key.slice(0,10) + '···' + key.slice(-4);
+    setupScreen.style.display = 'none';
+    appScreen.classList.add('visible');
+    pingScript();
+  }
+
+  function showSetup() {
+    setupScreen.style.display = 'flex';
+    appScreen.classList.remove('visible');
+  }
+
+  // Init
+  var savedKey = getKey(); var savedUrl = getScript();
+  if (savedKey.startsWith('sk-') && savedUrl) { showApp(savedKey, savedUrl); }
+  else { showSetup(); }
+
+  keySaveBtn.addEventListener('click', function() {
+    var k = keyInput.value.trim();
+    var u = scriptInput.value.trim();
+    if (!k.startsWith('sk-')) { keyInput.style.borderColor='var(--danger)'; return; }
+    if (!u.includes('script.google.com')) { scriptInput.style.borderColor='var(--danger)'; return; }
+    localStorage.setItem('anthropic_api_key', k);
+    localStorage.setItem('apps_script_url',   u);
+    keyInput.style.borderColor=''; scriptInput.style.borderColor='';
+    showApp(k, u);
+  });
+
+  keyChangeBtn.addEventListener('click', function() {
+    keyInput.value = getKey(); scriptInput.value = getScript();
+    showSetup();
+  });
+
+  // ── APPS SCRIPT BRIDGE ────────────────────────────────────────────────────
+  function callScript(body) {
+    return fetch(scriptUrl, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      // No Content-Type header — Apps Script requires no preflight for simple requests
+    }).then(function(r) { return r.json(); });
+  }
+
+  function pingScript() {
+    scriptStatusTx.textContent = 'Connecting to Google Drive…';
+    callScript({action:'getSheetUrl'})
+      .then(function(d) {
+        if (d.ok) {
+          scriptDot.classList.add('connected');
+          scriptStatusTx.textContent = 'Google Drive connected';
+          scriptSub.classList.add('visible');
+          sheetLinkBtn.href  = d.url;
+          sheetLinkBtn.style.display = 'inline-block';
+          sheetLinkBtn2.href = d.url;
+          sheetLinkBtn2.style.display = 'inline-block';
+        } else {
+          scriptStatusTx.textContent = 'Drive error: ' + (d.error || 'unknown');
+        }
+      })
+      .catch(function() {
+        scriptStatusTx.textContent = 'Could not reach Apps Script — check URL';
+      });
+  }
+
+  function uploadReceipt(file, filename, b64) {
+    var mime = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+    if (mime==='image/heic'||mime==='image/heif') mime='image/jpeg';
+    return callScript({action:'uploadReceipt', filename:filename, data:b64, mimeType:mime});
+  }
+
+  function appendRow(row) {
+    return callScript({action:'appendRow', row:row});
+  }
+
+  function deleteFile(fileId) {
+    return callScript({action:'deleteFile', fileId:fileId});
+  }
+
+  function deleteRow(rowNum) {
+    return callScript({action:'deleteRow', rowNum:rowNum});
+  }
+
+  // ── DATE HELPERS ──────────────────────────────────────────────────────────
+  function toMMDDYY(raw) {
+    if (!raw) return '';
+    raw = raw.trim();
+    var m;
+    m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return m[2]+'/'+m[3]+'/'+m[1].slice(2);
+    m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    if (m) return m[2].padStart(2,'0')+'/'+m[1].padStart(2,'0')+'/'+m[3];
+    m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return m[2].padStart(2,'0')+'/'+m[1].padStart(2,'0')+'/'+m[3].slice(2);
+    var months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    m = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if (m){var mo=months[m[2].toLowerCase().slice(0,3)];if(mo)return mo+'/'+m[1].padStart(2,'0')+'/'+m[3].slice(2);}
+    m = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+    if (m){var mo2=months[m[1].toLowerCase().slice(0,3)];if(mo2)return mo2+'/'+m[2].padStart(2,'0')+'/'+m[3].slice(2);}
+    return raw;
+  }
+
+  function toDDMon(iso) {
+    if (!iso) return '';
+    var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return parseInt(m[3])+'-'+months[parseInt(m[2])-1];
+    return '';
+  }
+
+  // ── FILE LOADING ──────────────────────────────────────────────────────────
+  fileInputCam.addEventListener('change', function(){ if(fileInputCam.files[0]) loadFile(fileInputCam.files[0]); });
+  fileInputLib.addEventListener('change', function(){ if(fileInputLib.files[0]) loadFile(fileInputLib.files[0]); });
+
+  function loadFile(file) {
+    currentFile = file;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      currentBase64 = e.target.result.split(',')[1];
+      previewImg.src = e.target.result;
+      previewWrap.classList.add('visible');
+      scanBtn.classList.add('visible');
+      resultCard.classList.remove('visible');
+      addBtn.classList.remove('visible');
+      errorMsg.classList.remove('visible');
+      uploadStatus.classList.remove('visible');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearBtn.addEventListener('click', resetForm);
+  function resetForm() {
+    currentBase64=null; currentFile=null;
+    fileInputCam.value=''; fileInputLib.value=''; previewImg.src='';
+    previewWrap.classList.remove('visible');
+    scanBtn.classList.remove('visible');
+    resultCard.classList.remove('visible');
+    addBtn.classList.remove('visible');
+    errorMsg.classList.remove('visible');
+    uploadStatus.classList.remove('visible');
+    if(fieldCurrency) fieldCurrency.value='';
+    if(fieldAmount)   fieldAmount.value='';
+  }
+
+  // ── CLAUDE EXTRACTION ─────────────────────────────────────────────────────
+  var SYSTEM_PROMPT = 'You are a receipt data extractor. Return ONLY a valid JSON object — no markdown, no backticks, no explanation.\nSchema: {"date":"YYYY-MM-DD","amount":"grand total as a plain number, no currency symbol","currency":"3-letter ISO code","merchant":"store or business name","category":"one of: Airfare, Lodging, Ground Transport, Meals","desc_suffix":"2-4 word description e.g. Grab ride, Hotel stay, Meal with client"}\nRules:\n- date: always YYYY-MM-DD. DD/MM/YY means first number is the DAY.\n- amount: use the final total.\n- Use null for any field you cannot determine.';
+
+  function extractFromImage(b64, mime) {
+    return fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': getKey(),
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:600,
+        system: SYSTEM_PROMPT,
+        messages:[{role:'user', content:[
+          {type:'image', source:{type:'base64', media_type:mime, data:b64}},
+          {type:'text', text:'Extract date, total amount, currency, merchant, expense category, and a short description from this receipt.'}
+        ]}]
+      })
+    }).then(function(r){return r.json();})
+      .then(function(data){
+        var text='';
+        for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text'){text=data.content[i].text;break;}}
+        return JSON.parse(text.replace(/```json|```/g,'').trim());
+      });
+  }
+
+  scanBtn.addEventListener('click', function() {
+    if (!currentBase64) return;
+    setLoading(true);
+    errorMsg.classList.remove('visible');
+    resultCard.classList.remove('visible');
+    addBtn.classList.remove('visible');
+    uploadStatus.classList.remove('visible');
+
+    var mime = currentFile && currentFile.type && currentFile.type.startsWith('image/') ? currentFile.type : 'image/jpeg';
+    if (mime==='image/heic'||mime==='image/heif') mime='image/jpeg';
+
+    extractFromImage(currentBase64, mime)
+      .then(function(parsed){
+        var ddmon = toDDMon(parsed.date);
+        var desc  = ddmon ? ddmon + (parsed.desc_suffix ? ' '+parsed.desc_suffix : '') : (parsed.desc_suffix||'');
+        fieldDate.value     = toMMDDYY(parsed.date) || '';
+        fieldCategory.value = parsed.category  || '';
+        fieldDesc.value     = desc;
+        fieldMerchant.value = parsed.merchant  || '';
+        fieldCurrency.value = parsed.currency  || '';
+        fieldAmount.value   = parsed.amount != null ? String(parsed.amount) : '';
+        resultCard.classList.add('visible');
+        addBtn.classList.add('visible');
+        setLoading(false);
+      })
+      .catch(function(err){
+        errorMsg.textContent = err.message || 'Extraction failed.';
+        errorMsg.classList.add('visible');
+        setLoading(false);
+      });
+  });
+
+  function setLoading(on) {
+    scanBtn.disabled=on;
+    scanBtn.querySelector('.btn-text').textContent = on ? 'Scanning…' : 'Extract Date & Amount';
+    scanBtn.querySelector('.spinner').style.display = on ? 'block' : 'none';
+  }
+
+  // ── SAVE ──────────────────────────────────────────────────────────────────
+  addBtn.addEventListener('click', function() {
+    var date     = fieldDate.value.trim()     || '—';
+    var category = fieldCategory.value.trim() || '—';
+    var desc     = fieldDesc.value.trim()     || '—';
+    var merchant = fieldMerchant.value.trim() || '—';
+    var currency = fieldCurrency.value.trim() || '—';
+    var amount   = fieldAmount.value.trim()   || '—';
+    addBtn.disabled = true;
+
+    function finish(fileId, fileUrl, filename, rowNum) {
+      expenses.push({filename:filename, date:date, category:category, desc:desc,
+        merchant:merchant, currency:currency, amount:amount,
+        driveFileId:fileId||null, driveLink:fileUrl||null, sheetRow:rowNum||null});
+      renderLog(); logSection.classList.add('visible');
+      addBtn.disabled=false; resetForm();
+    }
+
+    if (scriptUrl && currentFile) {
+      showDriveStatus('uploading','Saving to Google Drive & Sheet…');
+      var safeName = merchant.replace(/[^a-z0-9]/gi,'_');
+      var safeDate = date.replace(/\//g,'-');
+      var ext = (currentFile.name.match(/\.[^.]+$/) || ['.jpg'])[0].toLowerCase();
+      var filename = 'receipt_'+safeDate+'_'+safeName+ext;
+
+      uploadReceipt(currentFile, filename, currentBase64)
+        .then(function(r){
+          var fileId=r.fileId; var fileUrl=r.fileUrl;
+          return appendRow([filename,date,category,desc,merchant,currency,amount])
+            .then(function(s){
+              showDriveStatus('done','✓ Saved to Drive + Sheet');
+              finish(fileId, fileUrl, filename, s.rowNum);
+            });
+        })
+        .catch(function(err){
+          showDriveStatus('fail','Save failed: '+err.message);
+          addBtn.disabled=false;
+        });
+    } else {
+      finish(null,null,currentFile?currentFile.name:'—',null);
+    }
+  });
+
+  function showDriveStatus(type, msg) {
+    uploadStatus.className='upload-status visible '+type;
+    statusSpinner.style.display = type==='uploading' ? 'block' : 'none';
+    statusText.textContent=msg;
+  }
+
+  // ── DELETE ────────────────────────────────────────────────────────────────
+  function deleteExpense(i) {
+    var e=expenses[i];
+    var btn=document.querySelector('[data-del="'+i+'"]');
+    if(btn) btn.disabled=true;
+
+    function doDelete(){
+      expenses.splice(i,1);
+      // Adjust sheet row numbers
+      for(var j=i;j<expenses.length;j++){
+        if(expenses[j].sheetRow && e.sheetRow && expenses[j].sheetRow>e.sheetRow) expenses[j].sheetRow--;
+      }
+      renderLog();
+      if(!expenses.length) logSection.classList.remove('visible');
+    }
+
+    var jobs=[];
+    if(e.driveFileId && scriptUrl) jobs.push(deleteFile(e.driveFileId));
+    if(e.sheetRow    && scriptUrl) jobs.push(deleteRow(e.sheetRow));
+    if(jobs.length) { Promise.all(jobs).then(doDelete).catch(function(err){alert('Delete failed: '+err.message);if(btn)btn.disabled=false;}); }
+    else doDelete();
+  }
+
+  delAllBtn.addEventListener('click', function() {
+    if(!expenses.length) return;
+    if(!confirm('Delete all '+expenses.length+' expenses? This also removes files from Google Drive and the tracker sheet.')) return;
+    var jobs=[];
+    expenses.forEach(function(e){
+      if(e.driveFileId && scriptUrl) jobs.push(deleteFile(e.driveFileId));
+      if(e.sheetRow    && scriptUrl) jobs.push(deleteRow(e.sheetRow));
+    });
+    Promise.all(jobs).then(function(){ expenses=[]; renderLog(); logSection.classList.remove('visible'); })
+      .catch(function(){ expenses=[]; renderLog(); logSection.classList.remove('visible'); });
+  });
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  function catClass(cat) {
+    if(!cat) return '';
+    var c=cat.toLowerCase();
+    if(c.indexOf('meal')!==-1) return 'meals';
+    if(c.indexOf('lodg')!==-1) return 'lodging';
+    if(c.indexOf('air') !==-1) return 'airfare';
+    if(c.indexOf('transport')!==-1||c.indexOf('ground')!==-1) return 'transport';
+    return '';
+  }
+
+  function renderLog() {
+    logCards.innerHTML='';
+    logCount.textContent=expenses.length;
+    expenses.forEach(function(e,i){
+      var card=document.createElement('div');
+      card.className='log-card';
+      card.innerHTML=
+        '<div class="log-card-filename">'+e.filename+'</div>'+
+        '<div class="log-card-top">'+
+          '<span class="log-card-cat '+catClass(e.category)+'">'+(e.category||'—')+'</span>'+
+          '<span class="log-card-date">'+e.date+'</span>'+
+        '</div>'+
+        '<div class="log-card-desc">'+e.desc+'</div>'+
+        '<div class="log-card-merchant">'+e.merchant+'</div>'+
+        '<div class="log-card-footer">'+
+          '<span class="log-card-amount">'+(e.currency?e.currency+' ':'')+e.amount+'</span>'+
+          '<div class="log-card-btns">'+
+            (e.driveLink?'<a class="drive-link" href="'+e.driveLink+'" target="_blank">View</a>':'')+
+            '<button class="del-row" data-del="'+i+'">Delete</button>'+
+          '</div>'+
+        '</div>';
+      logCards.appendChild(card);
+    });
+    logCards.querySelectorAll('.del-row').forEach(function(btn){
+      btn.addEventListener('click',function(){ deleteExpense(+btn.getAttribute('data-del')); });
+    });
+  }
+
+  exportBtn.addEventListener('click', function() {
+    var headers=['Filename','Date','Category','Description','Merchant','Currency','Amount'];
+    var rows=expenses.map(function(e){
+      return [e.filename,e.date,e.category,e.desc,e.merchant,e.currency,e.amount]
+        .map(function(v){return '"'+(v||'').replace(/"/g,'""')+'"';}).join(',');
+    }).join('\n');
+    var blob=new Blob([headers.join(',')+'\n'+rows],{type:'text/csv'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='coupa-expenses-'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  // ── BATCH ─────────────────────────────────────────────────────────────────
+  batchToggle.addEventListener('click', function(){
+    batchToggle.classList.toggle('open');
+    batchBody.classList.toggle('open');
+  });
+
+  batchDrop.addEventListener('dragover',function(e){e.preventDefault();batchDrop.classList.add('drag-over');});
+  batchDrop.addEventListener('dragleave',function(){batchDrop.classList.remove('drag-over');});
+  batchDrop.addEventListener('drop',function(e){e.preventDefault();batchDrop.classList.remove('drag-over');addBatchFiles(Array.from(e.dataTransfer.files));});
+  batchInput.addEventListener('change',function(){addBatchFiles(Array.from(batchInput.files));batchInput.value='';});
+
+  function addBatchFiles(files) {
+    files.forEach(function(f){ if(f.type.startsWith('image/')) batchFiles.push({file:f,status:'pending'}); });
+    renderBatchQueue();
+    batchRunBtn.style.display=batchFiles.length?'flex':'none';
+    batchRunLabel.textContent='Process All ('+batchFiles.length+' receipts)';
+  }
+
+  function renderBatchQueue() {
+    batchQueue.innerHTML='';
+    batchFiles.forEach(function(item,i){
+      var div=document.createElement('div'); div.className='batch-item'; div.id='batch-item-'+i;
+      var img=document.createElement('img'); img.className='batch-item-thumb'; img.src=URL.createObjectURL(item.file);
+      var info=document.createElement('div'); info.className='batch-item-info';
+      info.innerHTML='<div class="batch-item-name">'+item.file.name+'</div>'+
+        '<div class="batch-item-status '+item.status+'" id="batch-status-'+i+'">'+statusLabel(item.status)+'</div>';
+      var rm=document.createElement('button'); rm.className='batch-remove'; rm.innerHTML='&times;'; rm.setAttribute('data-bi',i);
+      rm.addEventListener('click',function(){
+        batchFiles.splice(+rm.getAttribute('data-bi'),1); renderBatchQueue();
+        batchRunBtn.style.display=batchFiles.length?'flex':'none';
+        if(batchFiles.length) batchRunLabel.textContent='Process All ('+batchFiles.length+' receipts)';
+      });
+      div.appendChild(img); div.appendChild(info); div.appendChild(rm);
+      batchQueue.appendChild(div);
+    });
+  }
+
+  function statusLabel(s){
+    return {pending:'Waiting…',processing:'Scanning…',done:'✓ Done',error:'✗ Failed'}[s]||'';
+  }
+
+  function updateBatchStatus(i,status){
+    batchFiles[i].status=status;
+    var el=document.getElementById('batch-status-'+i);
+    if(el){el.className='batch-item-status '+status; el.textContent=statusLabel(status);}
+  }
+
+  batchRunBtn.addEventListener('click', function(){
+    if(!getKey()){showSetup();return;}
+    if(!batchFiles.length) return;
+    batchRunBtn.disabled=true;
+    batchProgress.style.display='block';
+    var i=0;
+    function next(){
+      if(i>=batchFiles.length){
+        batchProgress.textContent='✓ All done! '+batchFiles.filter(function(f){return f.status==='done';}).length+'/'+batchFiles.length+' processed.';
+        batchRunBtn.disabled=false; logSection.classList.add('visible'); return;
+      }
+      var item=batchFiles[i];
+      if(item.status==='done'){i++;next();return;}
+      batchProgress.textContent='Processing '+(i+1)+' of '+batchFiles.length+'…';
+      updateBatchStatus(i,'processing');
+      var reader=new FileReader();
+      reader.onload=function(e){
+        var b64=e.target.result.split(',')[1];
+        var mime=item.file.type&&item.file.type.startsWith('image/')?item.file.type:'image/jpeg';
+        if(mime==='image/heic'||mime==='image/heif') mime='image/jpeg';
+        extractFromImage(b64,mime)
+          .then(function(parsed){
+            var ddmon=toDDMon(parsed.date);
+            var desc=ddmon?ddmon+(parsed.desc_suffix?' '+parsed.desc_suffix:''):(parsed.desc_suffix||'');
+            var date=toMMDDYY(parsed.date)||'—';
+            var category=parsed.category||'—';
+            var merchant=parsed.merchant||'—';
+            var currency=parsed.currency||'—';
+            var amount=parsed.amount!=null?String(parsed.amount):'—';
+
+            function finishBatch(fileId,fileUrl,filename,rowNum){
+              expenses.push({filename:filename,date:date,category:category,desc:desc,
+                merchant:merchant,currency:currency,amount:amount,
+                driveFileId:fileId||null,driveLink:fileUrl||null,sheetRow:rowNum||null});
+              renderLog(); updateBatchStatus(i,'done'); i++;
+              setTimeout(next,800);
+            }
+
+            if(scriptUrl&&item.file){
+              var safeName=merchant.replace(/[^a-z0-9]/gi,'_');
+              var safeDate=date.replace(/\//g,'-');
+              var ext=(item.file.name.match(/\.[^.]+$/)||['.jpg'])[0].toLowerCase();
+              var filename='receipt_'+safeDate+'_'+safeName+ext;
+              uploadReceipt(item.file,filename,b64)
+                .then(function(r){
+                  return appendRow([filename,date,category,desc,merchant,currency,amount])
+                    .then(function(s){ finishBatch(r.fileId,r.fileUrl,filename,s.rowNum); });
+                })
+                .catch(function(){ finishBatch(null,null,item.file.name,null); });
+            } else {
+              finishBatch(null,null,item.file.name,null);
+            }
+          })
+          .catch(function(err){ console.error(err); updateBatchStatus(i,'error'); i++; setTimeout(next,800); });
+      };
+      reader.readAsDataURL(item.file);
+    }
+    next();
+  });
+
+}); // end DOMContentLoaded
+</script>
+</body>
+</html>
